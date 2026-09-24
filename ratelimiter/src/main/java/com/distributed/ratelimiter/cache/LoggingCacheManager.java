@@ -3,6 +3,8 @@ package com.distributed.ratelimiter.cache;
 import java.util.Collection;
 import org.springframework.cache.Cache;
 import org.springframework.cache.CacheManager;
+import org.springframework.lang.NonNull;
+import org.springframework.lang.Nullable;
 
 public class LoggingCacheManager implements CacheManager {
 
@@ -13,7 +15,8 @@ public class LoggingCacheManager implements CacheManager {
 	}
 
 	@Override
-	public Cache getCache(String name) {
+	@Nullable
+	public Cache getCache(@NonNull String name) {
 		Cache cache = delegate.getCache(name);
 		if (cache == null) {
 			return null;
@@ -22,6 +25,7 @@ public class LoggingCacheManager implements CacheManager {
 	}
 
 	@Override
+	@NonNull
 	public Collection<String> getCacheNames() {
 		return delegate.getCacheNames();
 	}

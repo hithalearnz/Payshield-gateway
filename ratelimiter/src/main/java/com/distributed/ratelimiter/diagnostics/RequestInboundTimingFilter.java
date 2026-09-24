@@ -10,10 +10,14 @@ import org.springframework.lang.NonNull;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 /**
- * Records a high-resolution timestamp when request-path timing is enabled. Placed at the same
- * {@link org.springframework.core.Ordered#HIGHEST_PRECEDENCE} bucket as Spring Boot’s encoding
- * filter; together with {@link com.distributed.ratelimiter.rateLimiter.RateLimitFilter} at
- * {@code HIGHEST_PRECEDENCE + 1}, the delta approximates work in same-precedence filters plus any
+ * Records a high-resolution timestamp when request-path timing is enabled.
+ * Placed at the same
+ * {@link org.springframework.core.Ordered#HIGHEST_PRECEDENCE} bucket as Spring
+ * Boot’s encoding
+ * filter; together with
+ * {@link com.distributed.ratelimiter.rateLimiter.RateLimitFilter} at
+ * {@code HIGHEST_PRECEDENCE + 1}, the delta approximates work in
+ * same-precedence filters plus any
  * filters strictly between them.
  */
 public final class RequestInboundTimingFilter extends OncePerRequestFilter {
@@ -28,14 +32,15 @@ public final class RequestInboundTimingFilter extends OncePerRequestFilter {
 	}
 
 	@Override
-	protected boolean shouldNotFilter(HttpServletRequest request) {
+	protected boolean shouldNotFilter(@NonNull HttpServletRequest request) {
 		String path = request.getRequestURI();
 		return path.startsWith("/actuator/health") || path.startsWith("/swagger-ui") || path.startsWith("/v3/api-docs");
 	}
 
 	@Override
 	protected void doFilterInternal(@NonNull HttpServletRequest request, @NonNull HttpServletResponse response,
-			@NonNull FilterChain filterChain) throws ServletException, IOException {
+			@NonNull FilterChain filterChain)
+			throws ServletException, IOException {
 		if ("OPTIONS".equalsIgnoreCase(request.getMethod())) {
 			filterChain.doFilter(request, response);
 			return;

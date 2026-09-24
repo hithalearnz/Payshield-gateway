@@ -13,7 +13,7 @@ import java.util.UUID;
 
 @Entity
 @Table(name = "users")
-public class User {
+public class Merchant {
 
 	@Id
 	@GeneratedValue(strategy = GenerationType.UUID)
@@ -35,10 +35,10 @@ public class User {
 	@Column(nullable = false, updatable = false)
 	private Instant createdAt;
 
-	protected User() {
+	protected Merchant() {
 	}
 
-	public User(String username, String email, String password, Role role, Instant createdAt) {
+	public Merchant(String username, String email, String password, Role role, Instant createdAt) {
 		this.username = username;
 		this.email = email;
 		this.password = password;

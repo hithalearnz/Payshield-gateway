@@ -6,13 +6,13 @@ Reference implementation of a **horizontally scaled Spring Boot API** with **Red
 
 ## What this project is
 
-| Piece | Role |
-|--------|------|
-| **Spring Boot 4** (Java 17) | REST API: `/auth/*`, `/api/users/*`, OpenAPI/Swagger, Actuator health |
-| **nginx** | Single entrypoint (`:8090`), `least_conn` upstream to **5** identical app containers |
-| **Redis** | Atomic rate limits via **Lua**; optional **AOF** in Compose; **shared cache** for users |
-| **PostgreSQL** | Users, roles, credentials (bcrypt) |
-| **k6** | Load scripts for sustained traffic, login bursts, cache-oriented profiles |
+| Piece                       | Role                                                                                    |
+| --------------------------- | --------------------------------------------------------------------------------------- |
+| **Spring Boot 4** (Java 25) | REST API: `/auth/*`, `/api/users/*`, OpenAPI/Swagger, Actuator health                   |
+| **nginx**                   | Single entrypoint (`:8090`), `least_conn` upstream to **5** identical app containers    |
+| **Redis**                   | Atomic rate limits via **Lua**; optional **AOF** in Compose; **shared cache** for users |
+| **PostgreSQL**              | Users, roles, credentials (bcrypt)                                                      |
+| **k6**                      | Load scripts for sustained traffic, login bursts, cache-oriented profiles               |
 
 Rate limiting is implemented as a **servlet `Filter`** that runs very early (after a thin diagnostics filter). It enforces limits **per client IP** and, when a `Bearer` JWT is present, **per authenticated user id**—using the **same Redis keys** from every replica, so limits are global across the cluster.
 
@@ -116,13 +116,13 @@ flowchart LR
 
 Defined in `ratelimiter/src/main/resources/application.yml` (overridable with environment variables):
 
-| Area | Purpose |
-|------|---------|
-| `app.rate-limit.token-bucket.*` | Burst-friendly **capacity** and **refill per second** for IP and user |
-| `app.rate-limit.sliding-window.*` | **Window length** and **max requests** for IP and user |
-| `app.instance.id` | Replica id (`APP_INSTANCE_ID` in Compose) → `X-Instance-Id` header |
-| `app.jwt.*` | HS256 secret and token lifetime |
-| Tomcat `threads`, `accept-count`, `max-connections` | Tunables for overload behavior under k6 |
+| Area                                                | Purpose                                                               |
+| --------------------------------------------------- | --------------------------------------------------------------------- |
+| `app.rate-limit.token-bucket.*`                     | Burst-friendly **capacity** and **refill per second** for IP and user |
+| `app.rate-limit.sliding-window.*`                   | **Window length** and **max requests** for IP and user                |
+| `app.instance.id`                                   | Replica id (`APP_INSTANCE_ID` in Compose) → `X-Instance-Id` header    |
+| `app.jwt.*`                                         | HS256 secret and token lifetime                                       |
+| Tomcat `threads`, `accept-count`, `max-connections` | Tunables for overload behavior under k6                               |
 
 Compose wires **five** app services with distinct `APP_INSTANCE_ID`, one Redis, one Postgres, and nginx publishing **host port 8090**.
 
@@ -130,14 +130,14 @@ Compose wires **five** app services with distinct `APP_INSTANCE_ID`, one Redis, 
 
 ## Tradeoffs
 
-| Choice | Benefit | Cost / risk |
-|--------|---------|-------------|
-| **Redis + Lua** | Strong atomicity per key pair; simple horizontal scale-out | Redis becomes a **critical dependency**; hot keys can become bottlenecks |
-| **Token bucket + sliding window together** | Smooth bursts **and** hard caps per rolling interval | More Redis work per allowed request than a single algorithm |
-| **JWT parsed in `RateLimitFilter`** | User scoped limits without hitting the DB on every request | **Duplicate JWT work** with Spring Security’s filter; must stay consistent with signing/validation assumptions |
-| **`X-Forwarded-For` first hop as IP** | Correct client IP behind nginx | If the edge proxy is **not** trusted, clients could spoof IPs—**terminate TLS and sanitize headers** at a trusted boundary |
-| **`ddl-auto: update`** (default in yml) | Fast local/demo iteration | **Not** a production migration strategy—use explicit schema management |
-| **JDK serialization for cache values** | Quick integration with Spring Data Redis cache | Less portable/evolvable than explicit DTO serialization; ensure classpath compatibility when upgrading |
+| Choice                                     | Benefit                                                    | Cost / risk                                                                                                                |
+| ------------------------------------------ | ---------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| **Redis + Lua**                            | Strong atomicity per key pair; simple horizontal scale-out | Redis becomes a **critical dependency**; hot keys can become bottlenecks                                                   |
+| **Token bucket + sliding window together** | Smooth bursts **and** hard caps per rolling interval       | More Redis work per allowed request than a single algorithm                                                                |
+| **JWT parsed in `RateLimitFilter`**        | User scoped limits without hitting the DB on every request | **Duplicate JWT work** with Spring Security’s filter; must stay consistent with signing/validation assumptions             |
+| **`X-Forwarded-For` first hop as IP**      | Correct client IP behind nginx                             | If the edge proxy is **not** trusted, clients could spoof IPs—**terminate TLS and sanitize headers** at a trusted boundary |
+| **`ddl-auto: update`** (default in yml)    | Fast local/demo iteration                                  | **Not** a production migration strategy—use explicit schema management                                                     |
+| **JDK serialization for cache values**     | Quick integration with Spring Data Redis cache             | Less portable/evolvable than explicit DTO serialization; ensure classpath compatibility when upgrading                     |
 
 **Stress characterization (where time goes):** With the default stack, **Redis** script latency stayed in the **sub-millisecond to low-millisecond** range in observed runs—it was **not** the dominant bottleneck once traffic was high. Instead, **waiting in the servlet container** and **CPU-heavy auth paths** (for example **bcrypt** on `/auth/login`) showed **thread-pool saturation** and **queueing**: peak **waiting** on the order of **~9–12 seconds** under the heaviest login-weighted mixes, and end-to-end latency long tails (**p90 ~3.2–7.7 s**, **p95 ~3.3–7.8 s**, **max ~14 s**) while the median remained **~0.29–0.69 s** and averages **~0.7–1.7 s** depending on scenario stage. Throughput then tracks scenario mix: **~800–1,100 req/s** at the highest sustained-window samples versus **~97–277 req/s** (and **~97–275 iterations/s**) when stages are more IP-throttled or login-bound.
 
@@ -145,13 +145,13 @@ Compose wires **five** app services with distinct `APP_INSTANCE_ID`, one Redis, 
 
 ## Failure scenarios and behavior
 
-| Scenario | What typically happens |
-|----------|-------------------------|
-| **Redis unavailable** | Rate limit `execute` fails; requests are likely to **error (5xx)** unless you add resilience (circuit breaker, fail-open, or queued retry). This stack prioritizes **correct enforcement** over silent bypass. |
-| **PostgreSQL unavailable** | Registration/login and DB-backed paths fail; **Actuator** may still expose liveness depending on health contributors—validate before relying on it in K8s. |
-| **Single app replica down** | nginx `max_fails` / `fail_timeout` marks upstream unhealthy; traffic shifts to peers. **Rate limits remain correct** as long as Redis is up. |
-| **Clock skew between app hosts** | Token bucket uses **`System.currentTimeMillis()`** from the app JVM passed into Lua; large skew between replicas can slightly distort refill behavior (usually minor vs window sizes). |
-| **Very aggressive limits + k6 setup from one IP** | Bulk `/auth/register` from a single machine can hit **IP** limits; scripts pace/register with retries—see `k6/sustained_load.js` comments. |
+| Scenario                                          | What typically happens                                                                                                                                                                                         |
+| ------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Redis unavailable**                             | Rate limit `execute` fails; requests are likely to **error (5xx)** unless you add resilience (circuit breaker, fail-open, or queued retry). This stack prioritizes **correct enforcement** over silent bypass. |
+| **PostgreSQL unavailable**                        | Registration/login and DB-backed paths fail; **Actuator** may still expose liveness depending on health contributors—validate before relying on it in K8s.                                                     |
+| **Single app replica down**                       | nginx `max_fails` / `fail_timeout` marks upstream unhealthy; traffic shifts to peers. **Rate limits remain correct** as long as Redis is up.                                                                   |
+| **Clock skew between app hosts**                  | Token bucket uses **`System.currentTimeMillis()`** from the app JVM passed into Lua; large skew between replicas can slightly distort refill behavior (usually minor vs window sizes).                         |
+| **Very aggressive limits + k6 setup from one IP** | Bulk `/auth/register` from a single machine can hit **IP** limits; scripts pace/register with retries—see `k6/sustained_load.js` comments.                                                                     |
 
 In the documented stress passes, the **Docker Compose** stack stayed **up** (**no crashes**, **no interrupted** k6 iterations attributed to backend death); failures were dominated by **429** as intended rather than mass **5xx** (see **How rate limiting works**).
 
@@ -164,7 +164,7 @@ For production you would add **timeouts**, **bulkheads**, **idempotency**, **rat
 ### Prerequisites
 
 - **Docker** + **Docker Compose** (v2 plugin)
-- Optional: **Java 17**, **Maven**, **k6** for local runs without Docker
+- Optional: **Java 25**, **Maven**, **k6** for local runs without Docker
 
 ### Run the full stack (recommended)
 

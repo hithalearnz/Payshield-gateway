@@ -1,15 +1,13 @@
 package com.distributed.ratelimiter.repository;
 
-import com.distributed.ratelimiter.entity.User;
+import com.distributed.ratelimiter.entity.Merchant;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
 
-public interface UserRepository extends JpaRepository<User, UUID> {
+public interface MerchantRepository extends JpaRepository<Merchant, UUID> {
 
-	Optional<User> findByUsername(String username);
-
-	Optional<User> findByEmail(String email);
+	Optional<Merchant> findByUsername(String username);
 
 	boolean existsByUsername(String username);
 

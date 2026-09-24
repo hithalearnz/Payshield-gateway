@@ -9,7 +9,8 @@ import org.springframework.lang.NonNull;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 /**
- * Sets {@value #HEADER_NAME} on every response so clients can see which app replica handled the request
+ * Sets {@value #HEADER_NAME} on every response so clients can see which app
+ * replica handled the request
  * (works for errors and rate limits too).
  */
 public class InstanceIdHeaderFilter extends OncePerRequestFilter {
@@ -24,7 +25,8 @@ public class InstanceIdHeaderFilter extends OncePerRequestFilter {
 
 	@Override
 	protected void doFilterInternal(@NonNull HttpServletRequest request, @NonNull HttpServletResponse response,
-			@NonNull FilterChain filterChain) throws ServletException, IOException {
+			@NonNull FilterChain filterChain)
+			throws ServletException, IOException {
 		response.setHeader(HEADER_NAME, instanceProperties.id());
 		filterChain.doFilter(request, response);
 	}

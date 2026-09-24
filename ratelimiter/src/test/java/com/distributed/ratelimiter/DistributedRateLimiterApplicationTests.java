@@ -12,6 +12,7 @@ import org.testcontainers.utility.DockerImageName;
 
 @SpringBootTest
 @Testcontainers(disabledWithoutDocker = true)
+@SuppressWarnings("resource")
 class DistributedRateLimiterApplicationTests {
 
 	@Container

@@ -1,7 +1,7 @@
 package com.distributed.ratelimiter.security;
 
 import com.distributed.ratelimiter.config.JwtProperties;
-import com.distributed.ratelimiter.entity.User;
+import com.distributed.ratelimiter.entity.Merchant;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
@@ -35,13 +35,12 @@ public class JwtService {
 		}
 		try {
 			return MessageDigest.getInstance("SHA-256").digest(raw);
-		}
-		catch (NoSuchAlgorithmException e) {
+		} catch (NoSuchAlgorithmException e) {
 			throw new IllegalStateException(e);
 		}
 	}
 
-	public String generateToken(User user) {
+	public String generateToken(Merchant user) {
 		Date now = new Date();
 		Date exp = new Date(now.getTime() + properties.expirationMs());
 		return Jwts.builder()
@@ -58,8 +57,7 @@ public class JwtService {
 		try {
 			Claims claims = Jwts.parser().verifyWith(key).build().parseSignedClaims(token).getPayload();
 			return Optional.of(claims);
-		}
-		catch (Exception ex) {
+		} catch (Exception ex) {
 			return Optional.empty();
 		}
 	}

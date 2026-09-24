@@ -12,10 +12,13 @@ import org.springframework.lang.NonNull;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 /**
- * First filter in the Spring Security {@code FilterChainProxy} chain. Measures wall time for
- * everything after it: remaining security filters, {@code DispatcherServlet}, controllers, etc.
+ * First filter in the Spring Security {@code FilterChainProxy} chain. Measures
+ * wall time for
+ * everything after it: remaining security filters, {@code DispatcherServlet},
+ * controllers, etc.
  * <p>
- * Requests rejected by {@code RateLimitFilter} never reach this filter (they do not pass
+ * Requests rejected by {@code RateLimitFilter} never reach this filter (they do
+ * not pass
  * {@code DelegatingFilterProxy}).
  */
 public final class SecurityDownstreamTimingFilter extends OncePerRequestFilter {
@@ -30,7 +33,8 @@ public final class SecurityDownstreamTimingFilter extends OncePerRequestFilter {
 
 	@Override
 	protected void doFilterInternal(@NonNull HttpServletRequest request, @NonNull HttpServletResponse response,
-			@NonNull FilterChain filterChain) throws ServletException, IOException {
+			@NonNull FilterChain filterChain)
+			throws ServletException, IOException {
 		if (!diagnostics.securityDownstreamTiming()) {
 			filterChain.doFilter(request, response);
 			return;
@@ -38,8 +42,7 @@ public final class SecurityDownstreamTimingFilter extends OncePerRequestFilter {
 		long t0 = System.nanoTime();
 		try {
 			filterChain.doFilter(request, response);
-		}
-		finally {
+		} finally {
 			long ms = (System.nanoTime() - t0) / 1_000_000L;
 			if (ms >= diagnostics.securityDownstreamTimingThresholdMs()) {
 				log.warn(

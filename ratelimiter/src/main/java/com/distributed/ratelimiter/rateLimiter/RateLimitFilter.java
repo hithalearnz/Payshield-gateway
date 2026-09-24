@@ -2,6 +2,7 @@ package com.distributed.ratelimiter.rateLimiter;
 
 import com.distributed.ratelimiter.config.AppDiagnosticsProperties;
 import com.distributed.ratelimiter.config.AppInstanceProperties;
+import com.distributed.ratelimiter.config.InstanceIdHeaderFilter;
 import com.distributed.ratelimiter.diagnostics.RequestInboundTimingFilter;
 import com.distributed.ratelimiter.security.JwtService;
 import jakarta.servlet.FilterChain;
@@ -35,14 +36,15 @@ public class RateLimitFilter extends OncePerRequestFilter {
 	}
 
 	@Override
-	protected boolean shouldNotFilter(HttpServletRequest request) {
+	protected boolean shouldNotFilter(@NonNull HttpServletRequest request) {
 		String path = request.getRequestURI();
 		return path.startsWith("/actuator/health") || path.startsWith("/swagger-ui") || path.startsWith("/v3/api-docs");
 	}
 
 	@Override
 	protected void doFilterInternal(@NonNull HttpServletRequest request, @NonNull HttpServletResponse response,
-			@NonNull FilterChain filterChain) throws ServletException, IOException {
+			@NonNull FilterChain filterChain)
+			throws ServletException, IOException {
 		if ("OPTIONS".equalsIgnoreCase(request.getMethod())) {
 			filterChain.doFilter(request, response);
 			return;
@@ -52,7 +54,7 @@ public class RateLimitFilter extends OncePerRequestFilter {
 		Long priorChainMs = inboundNs == null ? null : (rateLimitFilterStartNs - inboundNs) / 1_000_000L;
 
 		String clientIp = resolveClientIp(request);
-		String member = request.getRequestURI() + ":" + Thread.currentThread().getId() + ":" + System.nanoTime();
+		String member = request.getRequestURI() + ":" + Thread.currentThread().threadId() + ":" + System.nanoTime();
 
 		long ipRedisStart = System.nanoTime();
 		boolean ipAllowed = rateLimiter.tryConsumeForIp(clientIp, member);
@@ -60,9 +62,7 @@ public class RateLimitFilter extends OncePerRequestFilter {
 
 		if (!ipAllowed) {
 			log.warn("rate_limit decision=blocked scope=ip ip={} path={}", clientIp, request.getRequestURI());
-			response.setStatus(HttpStatus.TOO_MANY_REQUESTS.value());
-			response.setContentType("application/json");
-			response.getWriter().write(rateLimitJson("ip"));
+			writeRateLimitResponse(response, "ip");
 			maybeLogRequestPathTiming(request, priorChainMs, ipRedisMs, null, null, "blocked", "ip",
 					rateLimitFilterStartNs);
 			return;
@@ -81,9 +81,7 @@ public class RateLimitFilter extends OncePerRequestFilter {
 			if (!userAllowed) {
 				log.warn("rate_limit decision=blocked scope=user userId={} ip={} path={}", userId.get(), clientIp,
 						request.getRequestURI());
-				response.setStatus(HttpStatus.TOO_MANY_REQUESTS.value());
-				response.setContentType("application/json");
-				response.getWriter().write(rateLimitJson("user"));
+				writeRateLimitResponse(response, "user");
 				maybeLogRequestPathTiming(request, priorChainMs, ipRedisMs, jwtParseMs, userRedisMs, "blocked", "user",
 						rateLimitFilterStartNs);
 				return;
@@ -97,6 +95,13 @@ public class RateLimitFilter extends OncePerRequestFilter {
 		maybeLogRequestPathTiming(request, priorChainMs, ipRedisMs, jwtParseMs, userRedisMs, "allowed", null,
 				rateLimitFilterStartNs);
 		filterChain.doFilter(request, response);
+	}
+
+	private void writeRateLimitResponse(HttpServletResponse response, String scope) throws IOException {
+		response.setHeader(InstanceIdHeaderFilter.HEADER_NAME, instanceProperties.id());
+		response.setStatus(HttpStatus.TOO_MANY_REQUESTS.value());
+		response.setContentType("application/json");
+		response.getWriter().write(rateLimitJson(scope));
 	}
 
 	private void maybeLogRequestPathTiming(HttpServletRequest request, Long priorChainMs, long ipRedisMs,
